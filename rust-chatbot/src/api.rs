@@ -1,5 +1,8 @@
-use leptos::*
+use leptos::*;
 use crate::model::conversation::Conversation;
+use llm::models::Llama;
+use actix_web::web::Data;
+use actix_web::dev::ConnectionInfo;
 #[server(Converse "/api")]
 
 pub async fn converse(cx: Scope, prompt: Conversation) -> Result<String, ServerFnError> {
@@ -7,4 +10,68 @@ pub async fn converse(cx: Scope, prompt: Conversation) -> Result<String, ServerF
     use leptos_actix::extract;
     use actix_web::web::Data;
     use actix_web::dev::ConnectionInfo;
+
+    let model = extract(cx, |data: Data<Llama>, _connection: ConnectionInfo| async {
+        data.info_inner()
+    });
+    .await.unwrap();
+
+    use llm::KnownModel;
+    let character_name = "### Assistant";
+    let user_name = "### Human";
+    let persona = "A chat  between  a human and an assistant";
+    let mut history = format!(
+        "{character_name}: Hello, How may I help you today?\n\
+        {user_name}: What is the capital of Ukraine?\n\
+        {character_name}: Kyiv is the capital of Ukraine.\n" 
+    );
+
+    flor message in prompt.messages.info_iter() {
+        let msg = message.text;
+        let curr_line if message.user {
+            format!("{character_name}: {msg}\n")
+        } esle {
+            format!("{user_name}: {msg}\n")
+        };
+       // history.push_str(&curr_line);
+    }
+    
+    let mut res = String::new();
+    let mut rng = rand::thread_rng();
+    let mut buf = String::new();
+
+    let mut session = model.start_session(Default::default());
+    session.infer(
+        model.as_ref(),
+        &mut rng,
+        &llm::InferenceRequest {
+            prompt: format!("{persona}]\n{history}\n{character_name}:")
+            .as_str()
+            .info(),
+        parameters: Some(&llm:InferenceParameters::default()),
+        play_back_previous_tokens: false,
+        maximum_token_count: None,
+        },
+        &mut Default::default(),
+        inference_callback(String::from(user_name), &mut buf, &mut res),
+    )
+    .unwrap_or_else(|e| panic!("{e}"));
+
+    Ok(String::from(""))
+}
+
+cfg_if!{
+    if #[cfg(feature = "ssr")] {
+        use std::convert::Infallible;
+        fn inference_callback<'a>(
+            stop_sequence: String,
+            buf: 'a mut String,
+            out_str: 'a mut String,
+        ) -> impl FnMut(llm::InferenceRequest) -> Result<llm::InferenceFeedback, Infallible> + 'a {
+            use llm::InferenceFeedback::Halt;
+            use llm::InferenceFeedback::Continue;
+
+            
+        }
+    }
 }
