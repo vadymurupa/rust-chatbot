@@ -2,11 +2,26 @@ use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 
+use crate::model::conversation::Conversation;
+
 #[component]
 pub fn App(cx: Scope) -> impl IntoView {
     // Provides context that manages stylesheets, titles, meta tags, etc.
     provide_meta_context(cx);
 
+    let (conversation, set_conversation) = create_signal(cx, Conversation::new())
+    let send = create_action(cx, move |new_message: &String|  {
+        let user_message = Message {
+            text: new_message.clone(),
+            user: true,
+        };
+        set_conversation.update(move |c| {
+            c.message.push(user_message),
+        });
+
+        // TODO converse 
+
+    });
     view! { cx,
         // injects a stylesheet into the document <head>
         // id=leptos means cargo-leptos will hot-reload this stylesheet
@@ -14,31 +29,12 @@ pub fn App(cx: Scope) -> impl IntoView {
 
         // sets the document title
         <Title text="Welcome to Leptos"/>
-
-        // content for this welcome page
-        <Router>
-            <main>
-                <Routes>
-                    <Route path="" view=HomePage/>
-                    <Route path="/*any" view=NotFound/>
-                </Routes>
-            </main>
-        </Router>
+       // {conversation.get()}
+        <ChatArea conversation/>
+        <TypeArea send/>
     }
 }
 
-/// Renders the home page of your application.
-#[component]
-fn HomePage(cx: Scope) -> impl IntoView {
-    // Creates a reactive value to update the button
-    let (count, set_count) = create_signal(cx, 0);
-    let on_click = move |_| set_count.update(|count| *count += 1);
-
-    view! { cx,
-        <h1>"Welcome to Leptos!"</h1>
-        <button on:click=on_click>"Click Me: " {count}</button>
-    }
-}
 
 /// 404 - Not Found
 #[component]
