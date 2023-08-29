@@ -33,7 +33,7 @@ pub async fn converse(cx: Scope, prompt: Conversation) -> Result<String, ServerF
         } esle {
             format!("{user_name}: {msg}\n")
         };
-       // history.push_str(&curr_line);
+       history.push_str(&curr_line);
     }
     
     let mut res = String::new();
@@ -48,7 +48,7 @@ pub async fn converse(cx: Scope, prompt: Conversation) -> Result<String, ServerF
             prompt: format!("{persona}]\n{history}\n{character_name}:")
             .as_str()
             .info(),
-        parameters: Some(&llm:InferenceParameters::default()),
+        parameters: &llm:InferenceParameters::default(),
         play_back_previous_tokens: false,
         maximum_token_count: None,
         },
@@ -57,10 +57,10 @@ pub async fn converse(cx: Scope, prompt: Conversation) -> Result<String, ServerF
     )
     .unwrap_or_else(|e| panic!("{e}"));
 
-    Ok(String::from(""))
+    Ok(res)
 }
 
-cfg_if!{
+cfg_if! {
     if #[cfg(feature = "ssr")] {
         use std::convert::Infallible;
         fn inference_callback<'a>(
@@ -71,7 +71,27 @@ cfg_if!{
             use llm::InferenceFeedback::Halt;
             use llm::InferenceFeedback::Continue;
 
-            
+            move |resp| match resp {
+                llm::InferenceResponse::InferredToken(t) => {
+                    let mut reverse_buf = buf.clone();
+                    reverse_buf.push_str(t.as_str());
+                    if stop_sequence.as_str().eq(reverse_buf.as_str()) {
+                        buf.clear();
+                        return Ok::<llm::InferenceFeedback, Infallible>(Halt);
+                    } else if stop_sequence.as_str().start_with(reverse_buf.as_str()) {
+                        buf.push_str(t.as_str());
+                        return Ok(Continue);
+                    }
+                    if buf.is_empty() {
+                        out_str.push_str(&t);
+                    } esle {
+                        out_str.push_str(&reverse_buf);
+                    } 
+                    Ok(Continue)
+                }
+                llm::InferenceResponse::EotToken => Ok(Halt),
+                _ => Ok(Continue),
+            }
         }
     }
 }
