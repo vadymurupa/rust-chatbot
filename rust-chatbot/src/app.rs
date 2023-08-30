@@ -2,7 +2,7 @@ use leptos::*;
 use leptos_meta::*;
 use leptos_router::*;
 
-use crate::model::conversation::Conversation;
+use crate::model::conversation::{Conversation, self};
 
 #[component]
 pub fn App(cx: Scope) -> impl IntoView {
@@ -19,9 +19,30 @@ pub fn App(cx: Scope) -> impl IntoView {
             c.message.push(user_message),
         });
 
-        // TODO converse 
+        converse(cx, conversation.get())
 
     });
+
+    create_effect(cx, |_| {
+        if let Some(_) = send.input().get() {
+            ley model_message = Message {
+                text: String::from("..."),
+                user: false,
+            };
+            set_conversation.update(move |c| {
+                c.messages.push(model_message);
+            });
+        }
+    });
+
+    create_effect(cx, move |_| {
+        if let Some(Ok(response)) = send.value().get() {
+            set_conversation.update(move |c| {
+                c.messages.last_mut().unwrap().text = response;
+            });
+        }
+    });
+
     view! { cx,
         // injects a stylesheet into the document <head>
         // id=leptos means cargo-leptos will hot-reload this stylesheet
